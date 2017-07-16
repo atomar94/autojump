@@ -26,18 +26,18 @@ else:
 
 
 BACKUP_THRESHOLD = 24 * 60 * 60
-Entry = namedtuple('Entry', ['path', 'weight'])
+Entry = namedtuple('Entry', ['name', 'command'])
 
 
 def dictify(entries):
     """
     Converts a list of entries into a dictionary where
-        key = path
-        value = weight
+        key = name
+        value = command : weight
     """
     result = {}
     for entry in entries:
-        result[entry.path] = entry.weight
+        result[entry.name] = entry.command + " : " + str(weight)
     return result
 
 
@@ -48,6 +48,9 @@ def entriefy(data):
         return map(convert, data.items())
     return imap(convert, data.iteritems())
 
+
+def load_commands(config):
+    
 
 def load(config):
     """Returns a dictonary (key=path, value=weight) loaded from data file."""

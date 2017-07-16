@@ -166,10 +166,10 @@ def print_tab_menu(needle, tab_entries, separator):
                 entry.path))
 
 
-def sanitize(directories):
-    # edge case to allow '/' as a valid path
-    clean = lambda x: unico(x) if x == os.sep else unico(x).rstrip(os.sep)
-    return list(imap(clean, directories))
+# Standardized sanitize
+# can take list or string
+def sanitize(names):
+    return list(name.strip() for name in names)
 
 
 def second(xs):

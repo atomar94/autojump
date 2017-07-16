@@ -100,22 +100,14 @@ def set_defaults():
 
 def parse_arguments():
     parser = ArgumentParser(
-        description='Automatically jump to directory passed as an argument.',
+        description='Alias Manager. Stores an alias database.',
         epilog="Please see autojump(1) man pages for full documentation.")
     parser.add_argument(
-        'directory', metavar='DIRECTORY', nargs='*', default='',
+        'name', metavar='NAME', nargs='?', const='nd', default='d',
         help='directory to jump to')
     parser.add_argument(
-        '-a', '--add', metavar='DIRECTORY',
-        help='add path')
-    parser.add_argument(
-        '-i', '--increase', metavar='WEIGHT', nargs='?', type=int,
-        const=10, default=False,
-        help='increase current directory weight')
-    parser.add_argument(
-        '-d', '--decrease', metavar='WEIGHT', nargs='?', type=int,
-        const=15, default=False,
-        help='decrease current directory weight')
+        '-a', '--add', metavar='COMMAND',
+        help='add command')
     parser.add_argument(
         '--complete', action="store_true", default=False,
         help='used for tab completion')
@@ -132,69 +124,25 @@ def parse_arguments():
     return parser.parse_args()
 
 
-def add_path(data, path, weight=10):
+def add_command(name, command):
     """
-    Add a new path or increment an existing one.
+    Add a new command.
 
-    os.path.realpath() is not used because it's preferable to use symlinks
-    with resulting duplicate entries in the database than a single canonical
-    path.
     """
-    path = unico(path).rstrip(os.sep)
-    if path == os.path.expanduser('~'):
-        return data, Entry(path, 0)
+    data[name] = command
 
-    data[path] = sqrt((data.get(path, 0) ** 2) + (weight ** 2))
-
-    return data, Entry(path, data[path])
-
-
-def decrease_path(data, path, weight=15):
-    """Decrease or zero out a path."""
-    path = unico(path).rstrip(os.sep)
-    data[path] = max(0, data.get(path, 0) - weight)
-    return data, Entry(path, data[path])
-
-
-def detect_smartcase(needles):
-    """
-    If any needles contain an uppercase letter then use case sensitive
-    searching. Otherwise use case insensitive searching.
-    """
-    return not any(imap(has_uppercase, needles))
+    return data, Entry(name, data[name])
 
 
 def find_matches(entries, needles, check_entries=True):
     """Return an iterator to matching entries."""
     # TODO(wting|2014-02-24): replace assertion with unit test
     assert isinstance(needles, list), "Needles must be a list."
-    ignore_case = detect_smartcase(needles)
 
     try:
         pwd = os.getcwdu()
     except OSError:
         pwd = None
-
-    # using closure to prevent constantly hitting hdd
-    def is_cwd(entry):
-        return os.path.realpath(entry.path) == pwd
-
-    if check_entries:
-        path_exists = lambda entry: os.path.exists(entry.path)
-    else:
-        path_exists = lambda _: True
-
-    data = sorted(
-        entries,
-        key=attrgetter('weight', 'path'),
-        reverse=True)
-
-    return ifilter(
-        lambda entry: not is_cwd(entry) and path_exists(entry),
-        chain(
-            match_consecutive(needles, data, ignore_case),
-            match_fuzzy(needles, data, ignore_case),
-            match_anywhere(needles, data, ignore_case)))
 
 
 def handle_tab_completion(needle, entries):
@@ -225,31 +173,6 @@ def handle_tab_completion(needle, entries):
                 check_entries=False)),
             TAB_SEPARATOR)
 
-
-def purge_missing_paths(entries):
-    """Remove non-existent paths from a list of entries."""
-    exists = lambda entry: os.path.exists(entry.path)
-    return ifilter(exists, entries)
-
-
-def print_stats(data, data_path):
-    for path, weight in sorted(data.items(), key=itemgetter(1)):
-        print_entry(Entry(path, weight))
-
-    print("________________________________________\n")
-    print("%d:\t total weight" % sum(data.values()))
-    print("%d:\t number of entries" % len(data))
-
-    try:
-        print_local(
-            "%.2f:\t current directory weight" % data.get(os.getcwdu(), 0))
-    except OSError:
-        # current directory no longer exists
-        pass
-
-    print("\ndata:\t %s" % data_path)
-
-
 def main(args):  # noqa
     if not is_autojump_sourced() and not is_windows():
         print("Please source the correct autojump file in your shell's")
@@ -261,36 +184,21 @@ def main(args):  # noqa
 
     # all arguments are mutually exclusive
     if args.add:
-        save(config, first(add_path(load(config), args.add)))
+        save(config, first(add_command(load(config), args.add)))
     elif args.complete:
         handle_tab_completion(
             needle=first(chain(sanitize(args.directory), [''])),
             entries=entriefy(load(config)))
-    elif args.decrease:
-        data, entry = decrease_path(load(config), get_pwd(), args.decrease)
-        save(config, data)
-        print_entry(entry)
-    elif args.increase:
-        data, entry = add_path(load(config), get_pwd(), args.increase)
-        save(config, data)
-        print_entry(entry)
-    elif args.purge:
-        old_data = load(config)
-        new_data = dictify(purge_missing_paths(entriefy(old_data)))
-        save(config, new_data)
-        print("Purged %d entries." % (len(old_data) - len(new_data)))
-    elif args.stat:
-        print_stats(load(config), config['data_path'])
-    elif not args.directory:
+    elif not args.name:
         # Return best match.
         entries = entriefy(load(config))
         print_local(first(chain(
-            imap(attrgetter('path'), find_matches(entries, [''])),
+            imap(attrgetter('name'), find_matches(entries, [''])),
             # always return a path to calling shell functions
             ['.'])))
     else:
         entries = entriefy(load(config))
-        needles = sanitize(args.directory)
+        needles = sanitize(args.name)
         tab_needle, tab_index, tab_path = \
             get_tab_entry_info(first(needles), TAB_SEPARATOR)
 

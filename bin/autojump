@@ -106,33 +106,40 @@ def parse_arguments():
         'name', metavar='NAME', nargs='?', const='nd', default='d',
         help='directory to jump to')
     parser.add_argument(
-        '-a', '--add', metavar='COMMAND',
+        '-a', '--add', metavar='ALIAS', dest='alias',
         help='add command')
     parser.add_argument(
         '--complete', action="store_true", default=False,
         help='used for tab completion')
     parser.add_argument(
-        '--purge', action="store_true", default=False,
+        '-r', '--remove', '--rm', 
+        metavar='ALIAS', 
+        action='store_true', 
+        dest='alias',
         help='remove non-existent paths from database')
     parser.add_argument(
         '-s', '--stat', action="store_true", default=False,
         help='show database entries and their key weights')
-    parser.add_argument(
-        '-v', '--version', action="version", version="%(prog)s v" +
-        VERSION, help='show version information')
 
     return parser.parse_args()
 
 
-def add_command(name, command):
+def add_command(config, args):
     """
     Add a new command.
 
     """
-    data[name] = command
+    aliases = load(config)
+    aliases[args['name']] = args['command']    
+    save(config, aliases)
 
-    return data, Entry(name, data[name])
 
+def remove_command(config, args):
+    """
+    Remove a command.
+    """
+    aliases = load(config)
+    if aliases[args['remove']]
 
 def find_matches(entries, needles, check_entries=True):
     """Return an iterator to matching entries."""
@@ -184,11 +191,14 @@ def main(args):  # noqa
 
     # all arguments are mutually exclusive
     if args.add:
-        save(config, first(add_command(load(config), args.add)))
+        add_command(config, args)
     elif args.complete:
         handle_tab_completion(
             needle=first(chain(sanitize(args.directory), [''])),
             entries=entriefy(load(config)))
+    elif args.remove:
+        remove_command(config, args)
+
     elif not args.name:
         # Return best match.
         entries = entriefy(load(config))

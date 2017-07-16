@@ -115,7 +115,7 @@ def save(config, data):
         temp.close()
 
         cfg_parser = configparser.ConfigParser()
-        cfg_parser['ALIAS'] = data['ALIAS']
+        cfg_parser['ALIAS'] = data
 
         with open(temp.name, 'w', encoding='utf-8', errors='replace') as f:
             cfg_parser.write(f)

@@ -9,6 +9,8 @@ from codecs import open
 from collections import namedtuple
 from tempfile import NamedTemporaryFile
 from time import time
+import configparser
+
 
 from autojump_utils import create_dir
 from autojump_utils import is_osx
@@ -33,11 +35,11 @@ def dictify(entries):
     """
     Converts a list of entries into a dictionary where
         key = name
-        value = command : weight
+        value = command
     """
     result = {}
     for entry in entries:
-        result[entry.name] = entry.command + " : " + str(weight)
+        result[entry.name] = entry.command
     return result
 
 
@@ -49,11 +51,8 @@ def entriefy(data):
     return imap(convert, data.iteritems())
 
 
-def load_commands(config):
-    
-
 def load(config):
-    """Returns a dictonary (key=path, value=weight) loaded from data file."""
+    """Returns a dictonary (key=name, value=command) loaded from data file."""
     xdg_aj_home = os.path.join(
         os.path.expanduser('~'),
         '.local',
@@ -66,26 +65,14 @@ def load(config):
     if not os.path.exists(config['data_path']):
         return {}
 
-    # example: u'10.0\t/home/user\n' -> ['10.0', u'/home/user']
-    parse = lambda line: line.strip().split('\t')
-
-    correct_length = lambda x: len(x) == 2
-
-    # example: ['10.0', u'/home/user'] -> (u'/home/user', 10.0)
-    tupleize = lambda x: (x[1], float(x[0]))
-
+    cfg_parser = configparser.ConfigParser()
+    cfg_parser.read(config['data_path'])
+ 
     try:
-        with open(
-                config['data_path'],
-                'r', encoding='utf-8',
-                errors='replace') as f:
-            return dict(
-                imap(
-                    tupleize,
-                    ifilter(correct_length, imap(parse, f))))
-    except (IOError, EOFError):
+        return dict(cfg_parser.items("ALIAS"))
+    except (IOError):
         return load_backup(config)
-
+ 
 
 def load_backup(config):
     if os.path.exists(config['backup_path']):
@@ -127,14 +114,14 @@ def save(config, data):
         # Windows cannot reuse the same open file name
         temp.close()
 
-        with open(temp.name, 'w', encoding='utf-8', errors='replace') as f:
-            for path, weight in data.items():
-                f.write(unico('%s\t%s\n' % (weight, path)))
+        cfg_parser = configparser.ConfigParser()
+        cfg_parser['ALIAS'] = data['ALIAS']
 
-            f.flush()
-            os.fsync(f)
+        with open(temp.name, 'w', encoding='utf-8', errors='replace') as f:
+            cfg_parser.write(f)
+
     except IOError as ex:
-        print('Error saving autojump data (disk full?)' % ex, file=sys.stderr)
+        print('Error saving AliasBot data (disk full?)' % ex, file=sys.stderr)
         sys.exit(1)
 
     # move temp_file -> autojump.txt
